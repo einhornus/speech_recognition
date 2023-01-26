@@ -60,14 +60,15 @@ class MarianTranslator(Base):
                 self.load_model(models[i][0], models[i][1])
 
     def load_model(self, src, dest):
-        model_name = choose_model(src, dest)
-        if not model_name in self.models:
-            print("Mariam downloading", model_name)
-            tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
-            model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
-            self.models[model_name] = model
-            self.tokenizers[model_name] = tokenizer
-            model.eval()
+        if src != dest:
+            model_name = choose_model(src, dest)
+            if not model_name in self.models:
+                print("Mariam downloading", model_name)
+                tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
+                model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
+                self.models[model_name] = model
+                self.tokenizers[model_name] = tokenizer
+                model.eval()
 
     def do_translate(self, text, src, dest):
         choosen_model = choose_model(src, dest)

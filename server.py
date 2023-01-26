@@ -1,3 +1,5 @@
+import sqlite3
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,6 +20,9 @@ import generate_subtitles
 import translation.translate_subs
 import translation.MultiTranslator
 import translation.MarianTranslator
+import storage.catalogue
+import storage.video
+import storage.search
 
 is_debug = False
 
@@ -33,7 +38,7 @@ app.add_middleware(
 )
 
 q = []
-
+catalogue = storage.catalogue.Catalogue()
 
 def boot():
     for i in range(len(q)):
@@ -45,36 +50,60 @@ def boot():
             obj = q[0]
             obj["status"] = "generating"
             obj["time_start"] = time.time()
+
             print("Generating " + obj["link"] + " " + obj["language"])
             youtube.download.download(obj["link"])
-            print("Downloaded", obj["link"])
+
             detected_language = generate_subtitles.detect_language("data//youtube//___media.mp4")
-            # if obj["language"] == "og":
-            if obj["language"] == 'en':
-                gensub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4",
-                                                               language='en',
-                                                               task="translate")
-                meta_obj = {"language": obj["language"], "original_language": detected_language}
-                json.dump(meta_obj, open(obj["meta_file_name2"], "w", encoding="utf-8"))
-                gensub.save(obj["srt_file_name2"])
-            else:
-                gensub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4", language=detected_language,
-                                                                  task="transcribe")
-                meta_obj = {"language": detected_language}
-                json.dump(meta_obj, open(obj["meta_file_name"], "w", encoding="utf-8"))
-                gensub.save(obj["srt_file_name"])
+            for requirement in obj["requirements"]:
+                if not os.path.exists(requirement):
+                    if requirement.endswith("_og.srt"):
+                        gensub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4",
+                                                                       language=detected_language,
+                                                                       task="transcribe")
+                        gensub.save(requirement)
+                    else:
+                        if requirement.endswith(".srt"):
+                            lang = requirement.replace(".srt", "").split("_")[-1]
+                            gensub = subtitles.subtitles.Subtitles(file=requirement.replace(lang, "og"))
+                            trans_sub = None
+                            if lang == "en" and detected_language != "en":
+                                trans_sub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4",
+                                                                                  language='en',
+                                                                                  task="translate")
+                            else:
+                                translator = translation.MarianTranslator.MarianTranslator()
+                                translator.load_model(detected_language, lang)
+                                new_tran = translation.translate_subs.just_translate(translator, gensub,
+                                                                                     detected_language, lang)
+                                trans_sub = subtitles.subtitles.Subtitles()
+                                trans_sub.data = new_tran
+                            trans_sub.save(requirement)
 
-                if obj["language"] != "og":
-                    translator = translation.MarianTranslator.MarianTranslator()
-                    translator.load_model(detected_language, obj["language"])
-                    new_tran = translation.translate_subs.just_translate(translator, gensub, detected_language, obj["language"])
-                    new_subs = subtitles.subtitles.Subtitles()
-                    new_subs.data = new_tran
-                    new_name = obj["srt_file_name"].replace("og.srt", obj["language"] + ".srt")
-                    new_subs.save(new_name)
-
-                    meta_obj = {"language": obj["language"], "original_language": detected_language}
-                    json.dump(meta_obj, open(obj["meta_file_name2"], "w", encoding="utf-8"))
+            id = obj["link"]
+            original_language = detected_language
+            language = obj["language"]
+            title = obj["title"]
+            description = obj["description"]
+            publish_date = obj["publish_date"]
+            thumbnail = obj["thumbnail"]
+            keywords = obj["keywords"]
+            duration = obj["duration"]
+            english_subs = obj["requirements"][-1]
+            content_subs = subtitles.subtitles.Subtitles(file=english_subs)
+            content = content_subs.get_content()
+            video = storage.video.Video(
+                id=id,
+                original_language=original_language,
+                language=language,
+                title=title,
+                description=description,
+                thumbnail=thumbnail,
+                keywords=keywords,
+                duration=duration,
+                content=content
+            )
+            catalogue.add_video(video)
 
             print("Subtitles generated")
             q.remove(obj)
@@ -104,25 +133,49 @@ def set_prior_queue(res, link, language):
         if item["status"] == "generating":
             item["time_generating"] = current_time - item["time_start"]
 
+
+@app.get("/search")
+async def search(query: str, language: str, original_language: str):
+    res = storage.search.search_catalogue(query, catalogue, language=language, original_language=original_language)
+    return res
+
+
 @app.get("/subtitles")
 async def request(background_tasks: BackgroundTasks, id: str, language: str = "og"):
     file_name = "data//youtube//" + id
     file_name += "_"
-    meta_file_name = file_name+"og.json"
-    srt_file_name = file_name+"og.srt"
+    meta_file_name = file_name + ".json"
+    srt_file_name = file_name + "og.srt"
 
-    srt_file_name2 = None
-    meta_file_name2 = None
+    requirements = []
+    if language == "og":
+        requirements.append(file_name + "og.srt")
+        requirements.append(file_name + "en" + ".srt")
+    if language != "og" and len(language) == 2:
+        requirements.append(file_name + "og" + ".srt")
+        requirements.append(file_name + language + ".srt")
+        if language != "en":
+            requirements.append(file_name + "en" + ".srt")
+    if len(language) == 5:
+        lang = language.split("_")[1]
+        requirements.append(file_name + "og" + ".srt")
+        requirements.append(file_name + lang + ".srt")
+        if lang != "en":
+            requirements.append(file_name + "en" + ".srt")
+    if len(language) > 5:
+        lang = language.split("_")[1]
+        requirements.append(file_name + "og" + ".srt")
+        requirements.append(file_name + lang + ".srt")
+        requirements.append(file_name + lang + "_hi" + ".srt")
+        if lang != "en":
+            requirements.append(file_name + "en" + ".srt")
 
-    if language != "og":
-        meta_file_name2 = srt_file_name.replace("og.srt", language + ".json")
-        srt_file_name2 = srt_file_name.replace("og.srt", language + ".srt")
+    remaining_requirements = []
+    for requirement in requirements:
+        if not os.path.exists(requirement):
+            remaining_requirements.append(requirement)
 
-    already_exists = os.path.exists(srt_file_name)
-    if language != "og":
-        already_exists = os.path.exists(srt_file_name2)
-
-    if not already_exists:
+    if len(remaining_requirements) > 0:
         que_obj = {}
         found = False
         for item in q:
@@ -133,11 +186,9 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             res = {}
             que_obj["link"] = id
             que_obj["language"] = language
-            que_obj["duration"] = youtube.utils.get_duration(id)
+            youtube.utils.get_attributes(que_obj)
+            que_obj["requirements"] = requirements
             que_obj["meta_file_name"] = meta_file_name
-            que_obj["srt_file_name"] = srt_file_name
-            que_obj["meta_file_name2"] = meta_file_name2
-            que_obj["srt_file_name2"] = srt_file_name2
             que_obj["status"] = "pending"
             que_obj["time_add"] = time.time()
             q.append(que_obj)
@@ -156,26 +207,38 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             background_tasks.add_task(boot)
             return res
     else:
-        if language == "og":
-            res = json.load(open(meta_file_name, "r", encoding="utf-8"))
+        if len(language) == 2:
+            res = {}
+            srt_file_name = requirements[-1]
             subs = subtitles.subtitles.Subtitles(file=srt_file_name)
             res["subtitles"] = []
             for i in range(len(subs.data)):
                 res["subtitles"].append(subs.data[i])
             res["status"] = "done"
-        else:
-            res = json.load(open(meta_file_name2, "r", encoding="utf-8"))
-            subs = subtitles.subtitles.Subtitles(file=srt_file_name2)
-            res["subtitles"] = []
-            for i in range(len(subs.data)):
-                res["subtitles"].append(subs.data[i])
+            if language == "og":
+                res["type"] = "singular_og"
+            else:
+                res["type"] = "singular_translation"
+        if len(language) == 5:
+            res = {}
+            original_subs = requirements[0]
+            language_subs = requirements[1]
+            subs1 = subtitles.subtitles.Subtitles(file=original_subs)
+            subs2 = subtitles.subtitles.Subtitles(file=language_subs)
+            res["original"] = []
+            for i in range(len(subs1.data)):
+                res["original"].append(subs1.data[i])
+            res["translation"] = []
+            for i in range(len(subs2.data)):
+                res["translation"].append(subs2.data[i])
             res["status"] = "done"
+            res["type"] = "dual"
         background_tasks.add_task(boot)
         return res
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", debug=True, reload=True, host="0.0.0.0", port=8009)
+    uvicorn.run("server:app", debug=True, reload=False, host="0.0.0.0", port=8009)
 
     """
     t = translation.MarianTranslator.MarianTranslator()
@@ -189,10 +252,8 @@ if __name__ == "__main__":
     print(res)
     """
 
-
-
 """
-как учили писать и читать
+как на Руси учили писать и читать
 http://164.90.201.98/?videoId=d9rrz9X-ocI&language=en
 http://164.90.201.98/?videoId=d9rrz9X-ocI&language=og
 
@@ -200,7 +261,7 @@ http://164.90.201.98/?videoId=d9rrz9X-ocI&language=og
 http://164.90.201.98/?videoId=0cLWSa0ABBM&language=en
 http://164.90.201.98/?videoId=0cLWSa0ABBM&language=og
 
-лежеюокер уснул на уроке
+лежебокер уснул на уроке
 http://164.90.201.98/?videoId=2i3u8VJjzBQ&language=og
 http://164.90.201.98/?videoId=2i3u8VJjzBQ&language=en
 
