@@ -1,5 +1,5 @@
 import whisper
-import subtitles.subs
+import subs.subtitles
 import utils.language_utils
 import time
 from scipy.io.wavfile import write
@@ -9,11 +9,9 @@ import matplotlib.pyplot as plt
 whisper_models = {}
 
 DEFAULT_MODEL = "large"
-backup_models = ["large"]
+backup_models = ["large", "medium"]
 # backup_models_en = ["large", "medium", "small", "tiny", "medium.en", "small.en", "tiny.en"]
-#backup_models_en = ["large", "medium", "small", "medium.en"]
-
-backup_models_en = ["large"]
+backup_models_en = ["large", "medium", "small", "medium.en"]
 
 # backup_models = ["large", "small", "tiny"]
 # backup_models_en = ["large", "small", "tiny", "medium.en", "small.en", "tiny.en"]

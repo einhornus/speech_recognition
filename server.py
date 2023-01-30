@@ -9,7 +9,7 @@ import random
 import string
 import os
 import json
-import subtitles.subtitles
+import subtitles.subs
 from fastapi import BackgroundTasks, FastAPI
 import time
 import asyncio
@@ -21,8 +21,6 @@ import translation.translate_subs
 import translation.MultiTranslator
 import translation.MarianTranslator
 import storage.catalogue
-import storage.video
-import storage.search
 
 is_debug = False
 
@@ -55,6 +53,10 @@ def boot():
             youtube.download.download(obj["link"])
 
             detected_language = generate_subtitles.detect_language("data//youtube//___media.mp4")
+            if detected_language != "en":
+                if obj["translation_language"] is None:
+                    obj["translation_language"] = "en"
+
             for requirement in obj["requirements"]:
                 if not os.path.exists(requirement):
                     if requirement.endswith("_og.srt"):
@@ -80,31 +82,18 @@ def boot():
                                 trans_sub.data = new_tran
                             trans_sub.save(requirement)
 
-            id = obj["link"]
+            video_id = obj["link"]
             original_language = detected_language
-            language = obj["language"]
+            translation_language = obj["translation_language"]
             title = obj["title"]
-            description = obj["description"]
-            publish_date = obj["publish_date"]
             thumbnail = obj["thumbnail"]
-            keywords = obj["keywords"]
             duration = obj["duration"]
+            keywords = obj["keywords"]
             english_subs = obj["requirements"][-1]
             content_subs = subtitles.subtitles.Subtitles(file=english_subs)
             content = content_subs.get_content()
-            video = storage.video.Video(
-                id=id,
-                original_language=original_language,
-                language=language,
-                title=title,
-                description=description,
-                thumbnail=thumbnail,
-                keywords=keywords,
-                duration=duration,
-                content=content
-            )
-            catalogue.add_video(video)
-
+            catalogue.add_video(video_id, title, content, keywords, thumbnail, duration,
+                                original_language, translation_language, False)
             print("Subtitles generated")
             q.remove(obj)
 
@@ -136,7 +125,7 @@ def set_prior_queue(res, link, language):
 
 @app.get("/search")
 async def search(query: str, language: str, original_language: str):
-    res = storage.search.search_catalogue(query, catalogue, language=language, original_language=original_language)
+    res = catalogue.search(query, language=language, original_language=original_language)
     return res
 
 
@@ -144,8 +133,8 @@ async def search(query: str, language: str, original_language: str):
 async def request(background_tasks: BackgroundTasks, id: str, language: str = "og"):
     file_name = "data//youtube//" + id
     file_name += "_"
-    meta_file_name = file_name + ".json"
     srt_file_name = file_name + "og.srt"
+    translation_language = None
 
     requirements = []
     if language == "og":
@@ -154,12 +143,14 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
     if language != "og" and len(language) == 2:
         requirements.append(file_name + "og" + ".srt")
         requirements.append(file_name + language + ".srt")
+        translation_language = language
         if language != "en":
             requirements.append(file_name + "en" + ".srt")
     if len(language) == 5:
         lang = language.split("_")[1]
         requirements.append(file_name + "og" + ".srt")
         requirements.append(file_name + lang + ".srt")
+        translation_language = lang
         if lang != "en":
             requirements.append(file_name + "en" + ".srt")
     if len(language) > 5:
@@ -167,6 +158,7 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
         requirements.append(file_name + "og" + ".srt")
         requirements.append(file_name + lang + ".srt")
         requirements.append(file_name + lang + "_hi" + ".srt")
+        translation_language = lang
         if lang != "en":
             requirements.append(file_name + "en" + ".srt")
 
@@ -182,13 +174,14 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             if item["link"] == id and item["language"] == language:
                 found = True
                 que_obj = item.copy()
+        #found = False
         if not found:
             res = {}
             que_obj["link"] = id
             que_obj["language"] = language
             youtube.utils.get_attributes(que_obj)
             que_obj["requirements"] = requirements
-            que_obj["meta_file_name"] = meta_file_name
+            que_obj["translation_language"] = translation_language
             que_obj["status"] = "pending"
             que_obj["time_add"] = time.time()
             q.append(que_obj)
@@ -209,7 +202,9 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
     else:
         if len(language) == 2:
             res = {}
-            srt_file_name = requirements[-1]
+            srt_file_name = requirements[0]
+            if language != "og":
+                srt_file_name = srt_file_name.replace("og.srt", language+".srt")
             subs = subtitles.subtitles.Subtitles(file=srt_file_name)
             res["subtitles"] = []
             for i in range(len(subs.data)):
@@ -251,28 +246,3 @@ if __name__ == "__main__":
     new_subs.save("data//test2.srt")
     print(res)
     """
-
-"""
-как на Руси учили писать и читать
-http://164.90.201.98/?videoId=d9rrz9X-ocI&language=en
-http://164.90.201.98/?videoId=d9rrz9X-ocI&language=og
-
-нгемо ндонг
-http://164.90.201.98/?videoId=0cLWSa0ABBM&language=en
-http://164.90.201.98/?videoId=0cLWSa0ABBM&language=og
-
-лежебокер уснул на уроке
-http://164.90.201.98/?videoId=2i3u8VJjzBQ&language=og
-http://164.90.201.98/?videoId=2i3u8VJjzBQ&language=en
-
-  папаньки 1.1
-  http://164.90.201.98/?videoId=nE9UaU3eZDc&language=og
-  http://164.90.201.98/?videoId=nE9UaU3eZDc&language=en
-  
-history of the entire world, i guess
-http://164.90.201.98/?videoId=xuCn8ux2gbs&language=og
-
-nimfa ili tigrica
-http://164.90.201.98/?videoId=p5FHYqu_r1I&language=en
-http://164.90.201.98/?videoId=p5FHYqu_r1I&language=og
-"""

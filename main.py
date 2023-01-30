@@ -3,7 +3,7 @@ import time
 import utils.language_utils
 import json
 import os
-import subtitles.subtitles
+import subtitles.subs
 import generate_subtitles
 import youtube.download as youtube
 

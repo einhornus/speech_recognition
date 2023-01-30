@@ -38,7 +38,7 @@ class Translator():
         t2 = time.time()
         return t2 - t1
 
-    def translate(self, data, src: Optional[str], dest: Optional[str], db_path="data//translations.db"):
+    def translate(self, data, src: Optional[str], dest: Optional[str], db_path="data//database.db"):
         if src == dest:
             return data
 
