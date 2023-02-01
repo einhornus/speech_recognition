@@ -1,5 +1,6 @@
 import subtitles.subs
 
+
 def align(file_original, file_translation):
     subs_original = subtitles.subs.Subtitles(file=file_original).data
     subs_translation = subtitles.subs.Subtitles(file=file_translation).data
@@ -26,16 +27,22 @@ def align(file_original, file_translation):
     absolute_diff_limit = 500
 
     while True:
+        min_diff = 10000
         for i in range(len(subs_original)):
             for j in range(len(subs_translation)):
                 diff = abs(sizes_original[i] - sizes_translation[j])
-                if diff < absolute_diff_limit:
+                if diff < absolute_diff_limit and diff > 0:
                     midpoint = (subs_original[i]["from"] + subs_original[i]["to"]) / 2
                     move_original_me = diff / 2
                     move_original_neighbor = 0
                     move_translation_me = diff / 2
                     move_translation_neighbor = 0
 
+                    if diff < min_diff:
+                        min_diff = diff
+                        min_diff_i = i
+                        min_diff_j = j
+        print()
 
 
 if __name__ == "__main__":

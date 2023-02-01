@@ -39,6 +39,30 @@ class Catalogue:
         print()
 
     def search(self, query, original_language="an", language="og"):
+        """
+        search - perform a search of videos based on query, original language and language
+
+        This function searches through a list of videos (self.videos) and returns a list of videos that match the search criteria.
+        The search criteria are defined by the input query string (query), original language (original_language) and the desired language (language).
+
+        The function uses the "original_language" and "translation_language" fields of each video to determine if it is a candidate for the search.
+        If a query string is provided, the function will encode the query with BERT and compute its similarity with the video embeddings to determine relevance.
+        The function then sorts the results by relevance and returns the top results limited by the MAX_RESULTS constant.
+
+        Inputs:
+        query (str): The query string for the search.
+        original_language (str, optional): The original language of the video. Defaults to "an".
+        language (str, optional): The desired language of the video. Defaults to "og".
+
+        Returns:
+        list: A list of dictionaries representing the top matching videos, each containing the following fields:
+        "id": the video id
+        "language": the desired language of the video
+        "original_language": the original language of the video
+        "title": the title of the video
+        "thumbnail": the thumbnail image of the video
+        """
+
         candidates = []
         for video in self.videos:
             is_candidate = False
@@ -47,7 +71,7 @@ class Catalogue:
                     is_candidate = True
                 if language != "og" and video["translation_language"] == language:
                     is_candidate = True
-                if language != "og" and "og_"+video["translation_language"] == language:
+                if language != "og" and "og_" + video["translation_language"] == language:
                     is_candidate = True
             if is_candidate:
                 candidates.append(video)
@@ -83,6 +107,37 @@ class Catalogue:
 
     def add_video(self, video_id, title, content, keywords, thumbnail, duration, original_language,
                   translation_language, is_featured):
+
+        """
+            This function is used to add video information to the database and an in-memory list of videos.
+
+            The function starts by connecting to an SQLite database file, "data//database.db". It then uses the BERT
+            encoder from the "storage" module to generate an embedding for the content and the title of the video, in
+            English. The two embeddings are combined using a weighting factor, `TITLE_WEIGHT`, to produce a single
+            video embedding, which is then normalised to have a Euclidean norm of 1.
+
+            The list of keywords is joined into a single string, with each keyword separated by a semicolon, and
+            translated into English using the language detection module. The video information is then inserted into the
+            "videos" table in the SQLite database using an SQL INSERT statement.
+
+            Finally, a dictionary containing the video information is appended to the "videos" list, which is an attribute
+            of the class.
+
+            Args:
+            - video_id (str): A string representing the identifier of the video.
+            - title (str): The title of the video, in its original language.
+            - content (str): The full content of the video.
+            - keywords (List[str]): A list of strings representing the keywords associated with the video.
+            - thumbnail (str): A string representing the path to the thumbnail image of the video.
+            - duration (int): The length of the video in seconds.
+            - original_language (str): A string representing the original language of the video.
+            - translation_language (str): A string representing the translation language of the video.
+            - is_featured (bool): A Boolean value indicating whether the video is featured or not.
+
+            Returns:
+            None
+        """
+
         conn = sqlite3.connect("data//database.db")
         content_embedding = storage.bert.encode_bert(content)[0]
         english_title = translation.language_detection.to_english(title)

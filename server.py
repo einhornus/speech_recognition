@@ -1,22 +1,12 @@
-import sqlite3
-
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import uvicorn
-from os import listdir
-import random
-import string
 import os
-import json
 import subtitles.subs
 from fastapi import BackgroundTasks, FastAPI
 import time
-import asyncio
-from collections import deque
 import youtube.utils
 import youtube.download
-import generate_subtitles
+import subtitles.generation_core
 import translation.translate_subs
 import translation.MultiTranslator
 import translation.MarianTranslator
@@ -38,6 +28,7 @@ app.add_middleware(
 q = []
 catalogue = storage.catalogue.Catalogue()
 
+
 def boot():
     for i in range(len(q)):
         if q[i]["status"] == "generating":
@@ -52,7 +43,8 @@ def boot():
             print("Generating " + obj["link"] + " " + obj["language"])
             youtube.download.download(obj["link"])
 
-            detected_language = generate_subtitles.detect_language("data//youtube//___media.mp4")
+            detected_language = subtitles.generation_core.detect_language("data//youtube//_media.mp4")
+
             if detected_language != "en":
                 if obj["translation_language"] is None:
                     obj["translation_language"] = "en"
@@ -60,26 +52,36 @@ def boot():
             for requirement in obj["requirements"]:
                 if not os.path.exists(requirement):
                     if requirement.endswith("_og.srt"):
-                        gensub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4",
-                                                                       language=detected_language,
-                                                                       task="transcribe")
+                        pulled_subs = youtube.download.pull_subs(obj["link"], detected_language, only_manual=True)
+                        if pulled_subs is not None:
+                            gensub = pulled_subs
+                        else:
+                            gensub = subtitles.generation_core.generate_subtitles("data//youtube//_media.mp4",
+                                                                                  language=detected_language,
+                                                                                  task="transcribe")
                         gensub.save(requirement)
                     else:
                         if requirement.endswith(".srt"):
                             lang = requirement.replace(".srt", "").split("_")[-1]
-                            gensub = subtitles.subtitles.Subtitles(file=requirement.replace(lang, "og"))
+                            gensub = subtitles.subs.Subtitles(file=requirement.replace(lang, "og"))
                             trans_sub = None
-                            if lang == "en" and detected_language != "en":
-                                trans_sub = generate_subtitles.generate_subtitles("data//youtube//___media.mp4",
-                                                                                  language='en',
-                                                                                  task="translate")
+
+                            pulled_subs = youtube.download.pull_subs(obj["link"], lang)
+                            if pulled_subs is not None:
+                                trans_sub = pulled_subs
                             else:
-                                translator = translation.MarianTranslator.MarianTranslator()
-                                translator.load_model(detected_language, lang)
-                                new_tran = translation.translate_subs.just_translate(translator, gensub,
-                                                                                     detected_language, lang)
-                                trans_sub = subtitles.subtitles.Subtitles()
-                                trans_sub.data = new_tran
+                                if lang == "en" and detected_language != "en":
+                                    trans_sub = subtitles.generation_core.generate_subtitles(
+                                        "data//youtube//_media.mp4",
+                                        language='en',
+                                        task="translate")
+                                else:
+                                    translator = translation.MarianTranslator.MarianTranslator()
+                                    translator.load_model(detected_language, lang)
+                                    new_tran = translation.translate_subs.just_translate(translator, gensub,
+                                                                                         detected_language, lang)
+                                    trans_sub = subtitles.subs.Subtitles()
+                                    trans_sub.data = new_tran
                             trans_sub.save(requirement)
 
             video_id = obj["link"]
@@ -90,7 +92,7 @@ def boot():
             duration = obj["duration"]
             keywords = obj["keywords"]
             english_subs = obj["requirements"][-1]
-            content_subs = subtitles.subtitles.Subtitles(file=english_subs)
+            content_subs = subtitles.subs.Subtitles(file=english_subs)
             content = content_subs.get_content()
             catalogue.add_video(video_id, title, content, keywords, thumbnail, duration,
                                 original_language, translation_language, False)
@@ -129,6 +131,15 @@ async def search(query: str, language: str, original_language: str):
     return res
 
 
+def try_pull_subs(id, requirements):
+    for requirement in requirements:
+        if not os.path.exists(requirement):
+            language = requirement.replace(".srt", "").split("_")[-1]
+            pulled_subs = youtube.download.pull_subs(id, language)
+            if pulled_subs is not None:
+                pulled_subs.save(requirement)
+
+
 @app.get("/subtitles")
 async def request(background_tasks: BackgroundTasks, id: str, language: str = "og"):
     file_name = "data//youtube//" + id
@@ -162,6 +173,8 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
         if lang != "en":
             requirements.append(file_name + "en" + ".srt")
 
+    # try_pull_subs(id, requirements)
+
     remaining_requirements = []
     for requirement in requirements:
         if not os.path.exists(requirement):
@@ -174,7 +187,7 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             if item["link"] == id and item["language"] == language:
                 found = True
                 que_obj = item.copy()
-        #found = False
+        # found = False
         if not found:
             res = {}
             que_obj["link"] = id
@@ -204,8 +217,8 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             res = {}
             srt_file_name = requirements[0]
             if language != "og":
-                srt_file_name = srt_file_name.replace("og.srt", language+".srt")
-            subs = subtitles.subtitles.Subtitles(file=srt_file_name)
+                srt_file_name = srt_file_name.replace("og.srt", language + ".srt")
+            subs = subtitles.subs.Subtitles(file=srt_file_name)
             res["subtitles"] = []
             for i in range(len(subs.data)):
                 res["subtitles"].append(subs.data[i])
@@ -218,8 +231,8 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             res = {}
             original_subs = requirements[0]
             language_subs = requirements[1]
-            subs1 = subtitles.subtitles.Subtitles(file=original_subs)
-            subs2 = subtitles.subtitles.Subtitles(file=language_subs)
+            subs1 = subtitles.subs.Subtitles(file=original_subs)
+            subs2 = subtitles.subs.Subtitles(file=language_subs)
             res["original"] = []
             for i in range(len(subs1.data)):
                 res["original"].append(subs1.data[i])

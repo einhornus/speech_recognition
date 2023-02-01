@@ -14,6 +14,14 @@ class Subtitles:
             res += self.data[i]["text"] + "\n"
         return res
 
+    @staticmethod
+    def merge_subtitles(list):
+        res = Subtitles()
+        for i in range(len(list)):
+            res.data.extend(list[i].data)
+        res.data.sort(key=lambda x: x["from"])
+        return res
+
     def get_average_logprob(self, r = None):
         if r is None:
             r = (0, len(self.data)-1)
