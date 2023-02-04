@@ -7,6 +7,8 @@ import subtitles.vad
 import subtitles.textual_anomalies
 import subprocess
 
+import youtube.download
+
 whisper_models = {}
 DEFAULT_MODEL = "large"
 
@@ -118,13 +120,10 @@ def detect_language(media, model=DEFAULT_MODEL):
 
 
 if __name__ == "__main__":
+    #youtube.download.download("lj-5WovVG9o")
     file = "data//youtube//_media.mp4"
     detected_lang = detect_language("data//youtube//_media.mp4")
-    s = generate_subtitles("data//youtube//_media.mp4", detected_lang)
-    # s = generate_subtitles("data//youtube//___media.mp4", 'en', t=(10*60+25, 11*60+20))
-    # s = generate_subtitles("data//content//Serbian//Cartoons//Urfin Jus//Urfin Jus.mp4", 'hr')
-    # s = generate_subtitles("data//content//Russian//Music//Frozen, Let it go//video.mp4", 'hr')
-
+    s = generate_subtitles("data//youtube//_media.mp4", 'en')
     s.save("data//temp.srt")
 
     text = ""

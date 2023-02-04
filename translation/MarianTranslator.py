@@ -8,7 +8,6 @@ from nltk.tokenize import sent_tokenize
 from transformers import pipeline
 from transformers import MarianMTModel, MarianTokenizer
 
-
 """
 class MariamTranslator(Base):
 
@@ -49,7 +48,44 @@ def choose_model(src, dest):
         model_name = "tc-big-sh-en"
     return model_name
 
+
 class MarianTranslator(Base):
+    available_models = [
+        ["en", "es"],
+        ["en", "de"],
+        ["en", "fr"],
+        ["en", "it"],
+        ["en", "pt"],
+        ["en", "ru"],
+        ["en", "ja"],
+        ["en", "zh"],
+        ["en", "nl"],
+        ["en", "sv"],
+        ["en", "da"],
+        ["en", "no"],
+        ["en", "ko"],
+        ["en", "tr"],
+        ["en", "ar"],
+        ["en", "pl"],
+        ["en", "cs"],
+        ["ru", "en"],
+        ["de", "en"],
+        ["es", "en"],
+        ["fr", "en"],
+        ["it", "en"],
+        ["nl", "en"],
+        ["ja", "en"],
+        ["zh", "en"],
+        ["sv", "en"],
+        ["da", "en"],
+        ["no", "en"],
+        ["ko", "en"],
+        ["tr", "en"],
+        ["ar", "en"],
+        ["pl", "en"],
+        ["cs", "en"]
+    ]
+
     def __init__(self, models=None):
         super().__init__()
         self.models = {}
@@ -60,15 +96,31 @@ class MarianTranslator(Base):
                 self.load_model(models[i][0], models[i][1])
 
     def load_model(self, src, dest):
+        found_pair = False
+        for i in range(len(self.available_models)):
+            if self.available_models[i][0] == src and self.available_models[i][1] == dest:
+                found_pair = True
+                break
+
+        if not found_pair:
+            return False
+
         if src != dest:
             model_name = choose_model(src, dest)
             if not model_name in self.models:
                 print("Mariam downloading", model_name)
-                tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
-                model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-" + model_name, cache_dir = "models//Marian")
+                try:
+                    tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-" + model_name,
+                                                                cache_dir="models//Marian")
+                    model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-" + model_name,
+                                                          cache_dir="models//Marian")
+                except:
+                    print("Mariam downloading failed", model_name)
+                    return False
                 self.models[model_name] = model
                 self.tokenizers[model_name] = tokenizer
                 model.eval()
+        return True
 
     def do_translate(self, text, src, dest):
         choosen_model = choose_model(src, dest)
@@ -78,11 +130,11 @@ class MarianTranslator(Base):
         for i in range(len(text)):
             if choosen_model == 'tc-big-en-zle':
                 if dest == "ru":
-                    new_sentences = [">>rus<< "+text[i]]
+                    new_sentences = [">>rus<< " + text[i]]
                 if dest == "uk":
-                    new_sentences = [">>ukr<< "+text[i]]
+                    new_sentences = [">>ukr<< " + text[i]]
                 if dest == "be":
-                    new_sentences = [">>bel<< "+text[i]]
+                    new_sentences = [">>bel<< " + text[i]]
             else:
                 new_sentences = [text[i]]
             model = self.models[choosen_model]
@@ -99,4 +151,3 @@ class MarianTranslator(Base):
             res.append(res_element)
 
         return res
-

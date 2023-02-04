@@ -51,14 +51,17 @@ def to_english(message):
     """
 
     supported_langs = [
-        'es', 'ja', 'de', 'nl', 'ru', 'zh', 'ar', 'fr', 'it', 'ko', 'tr', 'po'
+        'es', 'ja', 'de', 'nl', 'ru', 'zh', 'ar', 'fr', 'it', 'ko', 'tr', 'pl', 'sv', 'da', 'no', 'cs'
     ]
 
     if language == "en" or language not in supported_langs:
         return message
     else:
-        translator.load_model(language, "en")
+        model_loaded = translator.load_model(language, "en")
+        if not model_loaded:
+            return message
         return translator.translate(message, language, "en")
+
 
 if __name__ == "__main__":
     print(to_english("Как тебя зовут?"))

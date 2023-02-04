@@ -50,7 +50,10 @@ def get_rank(code):
 
 
 def pull_subs(link, language, only_manual=False):
-    transcript_list = YouTubeTranscriptApi.list_transcripts(link)
+    try:
+        transcript_list = YouTubeTranscriptApi.list_transcripts(link)
+    except:
+        return None
 
     detected_language = None
 

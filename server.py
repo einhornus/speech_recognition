@@ -7,11 +7,12 @@ import time
 import youtube.utils
 import youtube.download
 import subtitles.generation_core
+import subtitles.synchronize
 import translation.translate_subs
 import translation.MultiTranslator
 import translation.MarianTranslator
 import storage.catalogue
-
+import server_core.requirements
 is_debug = False
 
 app = FastAPI()
@@ -51,38 +52,9 @@ def boot():
 
             for requirement in obj["requirements"]:
                 if not os.path.exists(requirement):
-                    if requirement.endswith("_og.srt"):
-                        pulled_subs = youtube.download.pull_subs(obj["link"], detected_language, only_manual=True)
-                        if pulled_subs is not None:
-                            gensub = pulled_subs
-                        else:
-                            gensub = subtitles.generation_core.generate_subtitles("data//youtube//_media.mp4",
-                                                                                  language=detected_language,
-                                                                                  task="transcribe")
-                        gensub.save(requirement)
-                    else:
-                        if requirement.endswith(".srt"):
-                            lang = requirement.replace(".srt", "").split("_")[-1]
-                            gensub = subtitles.subs.Subtitles(file=requirement.replace(lang, "og"))
-                            trans_sub = None
+                    server_core.requirements.meet_requirement(obj, requirement, detected_language)
 
-                            pulled_subs = youtube.download.pull_subs(obj["link"], lang)
-                            if pulled_subs is not None:
-                                trans_sub = pulled_subs
-                            else:
-                                if lang == "en" and detected_language != "en":
-                                    trans_sub = subtitles.generation_core.generate_subtitles(
-                                        "data//youtube//_media.mp4",
-                                        language='en',
-                                        task="translate")
-                                else:
-                                    translator = translation.MarianTranslator.MarianTranslator()
-                                    translator.load_model(detected_language, lang)
-                                    new_tran = translation.translate_subs.just_translate(translator, gensub,
-                                                                                         detected_language, lang)
-                                    trans_sub = subtitles.subs.Subtitles()
-                                    trans_sub.data = new_tran
-                            trans_sub.save(requirement)
+            english_subs_file = server_core.requirements.translate_to_english(obj, detected_language, obj["requirements"])
 
             video_id = obj["link"]
             original_language = detected_language
@@ -91,8 +63,7 @@ def boot():
             thumbnail = obj["thumbnail"]
             duration = obj["duration"]
             keywords = obj["keywords"]
-            english_subs = obj["requirements"][-1]
-            content_subs = subtitles.subs.Subtitles(file=english_subs)
+            content_subs = subtitles.subs.Subtitles(file=english_subs_file)
             content = content_subs.get_content()
             catalogue.add_video(video_id, title, content, keywords, thumbnail, duration,
                                 original_language, translation_language, False)
@@ -109,7 +80,6 @@ def set_prior_queue(res, link, language):
             is_generating = True
             time_generating = current_time - item["time_start"]
             break
-    # res["queue"] = q
     res["time_generating"] = 0
     res["is_generating"] = is_generating
     if is_generating:
@@ -142,43 +112,13 @@ def try_pull_subs(id, requirements):
 
 @app.get("/subtitles")
 async def request(background_tasks: BackgroundTasks, id: str, language: str = "og"):
-    file_name = "data//youtube//" + id
-    file_name += "_"
-    srt_file_name = file_name + "og.srt"
-    translation_language = None
-
-    requirements = []
-    if language == "og":
-        requirements.append(file_name + "og.srt")
-        requirements.append(file_name + "en" + ".srt")
-    if language != "og" and len(language) == 2:
-        requirements.append(file_name + "og" + ".srt")
-        requirements.append(file_name + language + ".srt")
-        translation_language = language
-        if language != "en":
-            requirements.append(file_name + "en" + ".srt")
-    if len(language) == 5:
-        lang = language.split("_")[1]
-        requirements.append(file_name + "og" + ".srt")
-        requirements.append(file_name + lang + ".srt")
-        translation_language = lang
-        if lang != "en":
-            requirements.append(file_name + "en" + ".srt")
-    if len(language) > 5:
-        lang = language.split("_")[1]
-        requirements.append(file_name + "og" + ".srt")
-        requirements.append(file_name + lang + ".srt")
-        requirements.append(file_name + lang + "_hi" + ".srt")
-        translation_language = lang
-        if lang != "en":
-            requirements.append(file_name + "en" + ".srt")
-
-    # try_pull_subs(id, requirements)
+    reqs, translation_language = server_core.requirements.produce_requirements(id, language)
 
     remaining_requirements = []
-    for requirement in requirements:
+    for requirement in reqs:
         if not os.path.exists(requirement):
             remaining_requirements.append(requirement)
+    try_pull_subs(id, reqs)
 
     if len(remaining_requirements) > 0:
         que_obj = {}
@@ -193,7 +133,7 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
             que_obj["link"] = id
             que_obj["language"] = language
             youtube.utils.get_attributes(que_obj)
-            que_obj["requirements"] = requirements
+            que_obj["requirements"] = reqs
             que_obj["translation_language"] = translation_language
             que_obj["status"] = "pending"
             que_obj["time_add"] = time.time()
@@ -215,10 +155,11 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
     else:
         if len(language) == 2:
             res = {}
-            srt_file_name = requirements[0]
+            srt_file_name = reqs[0]
             if language != "og":
                 srt_file_name = srt_file_name.replace("og.srt", language + ".srt")
             subs = subtitles.subs.Subtitles(file=srt_file_name)
+            subs = subtitles.synchronize.split_subs_timely(subs)
             res["subtitles"] = []
             for i in range(len(subs.data)):
                 res["subtitles"].append(subs.data[i])
@@ -229,10 +170,11 @@ async def request(background_tasks: BackgroundTasks, id: str, language: str = "o
                 res["type"] = "singular_translation"
         if len(language) == 5:
             res = {}
-            original_subs = requirements[0]
-            language_subs = requirements[1]
+            original_subs = reqs[0]
+            language_subs = reqs[1]
             subs1 = subtitles.subs.Subtitles(file=original_subs)
             subs2 = subtitles.subs.Subtitles(file=language_subs)
+            subs1, subs2 = subtitles.synchronize.sync_subs(subs1, subs2)
             res["original"] = []
             for i in range(len(subs1.data)):
                 res["original"].append(subs1.data[i])
@@ -249,13 +191,13 @@ if __name__ == "__main__":
     uvicorn.run("server:app", debug=True, reload=False, host="0.0.0.0", port=8009)
 
     """
-    t = translation.MarianTranslator.MarianTranslator()
-    t.load_model("ru", "en")
-    subs = subtitles.subtitles.Subtitles(file="data//test.srt")
-    res = translation.translate_subs.just_translate(t, subs, "ru", "en")
-    new_subs = subtitles.subtitles.Subtitles()
+    t = translation.MultiTranslator.MultiTranslator()
+    t.load_model("xx", "xx")
+    subs = subtitles.subs.Subtitles(file="data//temp.srt")
+    res = translation.translate_subs.just_translate(t, subs, "ru", "nl")
+    new_subs = subtitles.subs.Subtitles()
     new_subs.data = res
 
-    new_subs.save("data//test2.srt")
+    new_subs.save("data//temp2.srt")
     print(res)
     """

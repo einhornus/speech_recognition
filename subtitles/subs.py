@@ -7,6 +7,8 @@ class Subtitles:
             self.data = subtitles.utils.get_subs(args["file"])
         else:
             self.data = []
+        if "data" in args:
+            self.data = args["data"]
 
     def get_content(self):
         res = ""

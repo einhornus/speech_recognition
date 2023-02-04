@@ -32,7 +32,7 @@ class VAD:
         self.vads = []
         self.snrs = []
         self.c50s = []
-        self.first_frame_above_80 = None
+        self.first_frame_above_threshold = None
 
         for frame, (vad, snr, c50) in output:
             self.starts.append(round(frame.start * 1000))
@@ -41,14 +41,14 @@ class VAD:
             self.snrs.append(snr)
             self.c50s.append(c50)
             self.mids.append(round(frame.middle * 1000))
-            if vad > 0.8 and self.first_frame_above_80 is None:
-                self.first_frame_above_80 = round(frame.start*1000)
+            if vad > 0.8 and self.first_frame_above_threshold is None:
+                self.first_frame_above_threshold = round(frame.start * 1000)
 
     def is_music(self):
         return sum(self.snrs) / len(self.snrs) < 3
 
     def get_intervals_for_music(self):
-        return [(self.first_frame_above_80, self.ends[-1])]
+        return [(self.first_frame_above_threshold, self.ends[-1])]
 
     def get_intervals(self, strictness=SPEECH_THRESHOLD, t=None):
         intervals = []
