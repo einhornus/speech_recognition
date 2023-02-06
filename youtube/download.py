@@ -24,11 +24,27 @@ def xml_to_subs(xml_data):
 def transcript_to_subs(transcript):
     res = subtitles.subs.Subtitles()
     for i in range(len(transcript)):
+        text = transcript[i]["text"]
+        text = text.replace(u'\xa0', u' ')
+        if "\n" in text:
+            if len(text.split("\n")) == 2:
+                first_line = text.split("\n")[0]
+                second_line = text.split("\n")[1]
+                if len(second_line) > 0 and second_line[0].isupper() and len(first_line) > 0 and first_line[
+                    -1].isalpha():
+                    text = first_line + " " + second_line
+                else:
+                    if len(first_line) > 0 and first_line[-1] == ' ':
+                        text = first_line + second_line
+                    else:
+                        text = first_line + " " + second_line
+            else:
+                text = text.replace("\n", "")
         res.data.append(
             {
                 "from": int(transcript[i]["start"] * 1000),
                 "to": int(transcript[i]["start"] * 1000 + transcript[i]["duration"] * 1000),
-                "text": transcript[i]["text"].replace("\n", " ")
+                "text": text
             })
     return res
 
@@ -109,5 +125,5 @@ def pull_subs(link, language, only_manual=False):
 
 if __name__ == "__main__":
     # download("https://www.youtube.com/watch?v=gcKh4WvoSBs", False)
-    subs = pull_subs("xaQJbozY_Is", "nl")
-    print(subs)
+    subs = pull_subs("q4DF3j4saCE", "en")
+    print(subs.get_content())

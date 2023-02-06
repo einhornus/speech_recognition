@@ -76,6 +76,8 @@ def generate(wav, sample_rate, language, vad, model=DEFAULT_MODEL, task="transcr
 
 
 def generate_subtitles(media, language, model=DEFAULT_MODEL, task="transcribe"):
+    print("Generating subtitles in language ", language)
+
     wav_file = media.replace("mp4", "wav")
     subprocess.run(["ffmpeg", "-i", media, "-y", wav_file])
     sample_rate = 16000

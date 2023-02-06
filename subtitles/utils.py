@@ -73,6 +73,9 @@ def get_subs(path):
         lines = f.readlines()
     return parse_subtitles(lines)
 
+def get_subs_from_content(content):
+    lines = content.splitlines()
+    return parse_subtitles(lines)
 
 def parse_subtitles(data):
     groups = []
@@ -124,3 +127,14 @@ def drop(srt_subs, file_name):
 
     with open(file_name, mode='w', encoding='utf-8') as f:
         f.write(res)
+
+def get_subs_content(srt_subs):
+    res = ""
+    for i in range(len(srt_subs)):
+        res += str(i + 1) + "\n"
+        t1 = make_time(srt_subs[i]["from"])
+        t2 = make_time(srt_subs[i]["to"])
+        res += t1 + " --> " + t2 + "\n"
+        res += srt_subs[i]["text"] + "\n"
+        res += "\n"
+    return res

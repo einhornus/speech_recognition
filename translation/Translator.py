@@ -60,7 +60,11 @@ class Translator():
                 local_res = self.do_translate(group, src, dest)
                 res.extend(local_res)
                 print(local_res)
-            return res
+
+            if not is_list:
+                return res[0]
+            else:
+                return res
 
         results_array = []
 

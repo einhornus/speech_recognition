@@ -46,6 +46,22 @@ def choose_model(src, dest):
         model_name = "tc-big-en-zle"
     if src == "hr" and dest == "en":
         model_name = "tc-big-sh-en"
+    if src == "en" and dest in ["nl", "de", "af"]:
+        model_name = "tc-big-gmw-gmw"
+    if src == "en" and dest in ["sv", "da", "no"]:
+        model_name = "tc-big-en-gmq"
+    if src == "en" and dest == "es":
+        model_name = "tc-big-en-es"
+    if src == "en" and dest == "fr":
+        model_name = "tc-big-en-fr"
+    if src == "en" and dest == "it":
+        model_name = "tc-big-en-it"
+    if src == "en" and dest == "pt":
+        model_name = "tc-big-en-pt"
+    if src == "en" and dest == "ar":
+        model_name = "tc-big-en-ar"
+    if src == "en" and dest == "tr":
+        model_name = "tc-big-en-tr"
     return model_name
 
 
@@ -58,6 +74,7 @@ class MarianTranslator(Base):
         ["en", "pt"],
         ["en", "ru"],
         ["en", "ja"],
+        ["en", "ar"],
         ["en", "zh"],
         ["en", "nl"],
         ["en", "sv"],
@@ -128,13 +145,28 @@ class MarianTranslator(Base):
 
         res = []
         for i in range(len(text)):
-            if choosen_model == 'tc-big-en-zle':
+            if choosen_model in ['tc-big-en-zle', 'tc-big-gmw-gmw']:
                 if dest == "ru":
                     new_sentences = [">>rus<< " + text[i]]
                 if dest == "uk":
                     new_sentences = [">>ukr<< " + text[i]]
                 if dest == "be":
                     new_sentences = [">>bel<< " + text[i]]
+                if dest == "nl":
+                    new_sentences = [">>nld<< " + text[i]]
+                if dest == "de":
+                    new_sentences = [">>deu<< " + text[i]]
+                if dest == "af":
+                    new_sentences = [">>afr<< " + text[i]]
+                if dest == "sv":
+                    new_sentences = [">>swe<< " + text[i]]
+                if dest == "da":
+                    new_sentences = [">>dan<< " + text[i]]
+                if dest == "no":
+                    new_sentences = [">>nob<< " + text[i]]
+                if dest == "ar":
+                    new_sentences = [">>ara<< " + text[i]]
+
             else:
                 new_sentences = [text[i]]
             model = self.models[choosen_model]

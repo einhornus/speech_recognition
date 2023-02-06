@@ -1,53 +1,11 @@
-2023-02-04 06:44:25.739199: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libcudart.so.11.0'; dlerror: libcudart.so.11.0: cannot open shared object file: No such file or directory
-2023-02-04 06:44:25.739255: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+2023-02-06 05:16:06.961700: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libcudart.so.11.0'; dlerror: libcudart.so.11.0: cannot open shared object file: No such file or directory
+2023-02-06 05:16:06.961756: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
 /usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py:122: PkgResourcesDeprecationWarning: 0.1.36ubuntu1 is an invalid version and will not be supported in a future release
   warnings.warn(
 /usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py:122: PkgResourcesDeprecationWarning: 0.23ubuntu1 is an invalid version and will not be supported in a future release
   warnings.warn(
 Warning : `load_model` does not return WordVectorModel or SupervisedModel any more, but a `FastText` object which is very similar.
-INFO:     Started server process [2366977]
+INFO:     Started server process [2389234]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8009 (Press CTRL+C to quit)
-
-INFO:     78.109.77.90:20402 - "GET /search?query=&language=og&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20402 - "GET /search?query=&language=og&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /search?query=cats&language=og&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /search?query=cats&language=og_en&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /search?query=cats&language=en&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /search?query=cats&language=og_en&original_language=an HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-Generating H_QimWv6t6I og_en
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
-To disable this warning, you can either:
-	- Avoid using `tokenizers` before the fork if possible
-	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
-Downloaded in 0.12543988227844238 seconds
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK
-INFO:     78.109.77.90:20261 - "GET /subtitles?id=H_QimWv6t6I&language=og_en HTTP/1.1" 200 OK

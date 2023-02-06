@@ -1,53 +1,55 @@
 import copy
 
 
-def group_by_time(subs, limit, limit2=15):
-    groups = [[subs.data[0]]]
-    for i in range(1, len(subs.data)):
-        dist = subs.data[i]["from"] - subs.data[i - 1]["to"]
-        if dist > limit or len(groups[-1]) > limit2:
-            groups.append([subs.data[i]])
+def group_by_sentences(subs):
+    groups = []
+    current_group = []
+    for i in range(0, len(subs.data)):
+        if len(current_group) > 0 and len(current_group[-1]["text"]) > 0 and current_group[-1]["text"][-1] in [".", "!",                                                                                                    "?"]:
+            groups.append(current_group)
+            current_group = [subs.data[i]]
         else:
-            groups[len(groups) - 1].append(subs.data[i])
+            current_group.append(subs.data[i])
+
+    groups.append(current_group)
     return groups
 
 
 def just_translate(translator, srt, from_, to_):
+    delimiter = " + "
+
     newsrt = []
-    grouped = group_by_time(srt, -1)
+    grouped = group_by_sentences(srt)
 
-    all_contents = []
-    for i in range(len(grouped)):
-        content = ""
-        for j in range(len(grouped[i])):
-            content += grouped[i][j]["text"].replace("\n", " ")
-            content += "\n"
-        all_contents.append(content)
-    translator.translate(all_contents, from_, to_)
+    succes = 0
+    fail = 0
 
     for i in range(len(grouped)):
         content = ""
         for j in range(len(grouped[i])):
-            content += grouped[i][j]["text"].replace("\n", " ")
-            content += "\n"
-        res = translator.translate(content, from_, to_)
-        splitted = res.split("\n")
-
-        if len(grouped[i]) != len(res.split("\n")) - 1:
-            # print('error', len(grouped[i]), len(res.split("\n")))
+            content += grouped[i][j]["text"]
+            if j != len(grouped[i]) - 1:
+                content += delimiter
+        translation = translator.translate(content, from_, to_, db_path=None)
+        translation_content = translation.split(delimiter)
+        if len(translation_content) != len(grouped[i]):
+            fail += 1
             for j in range(len(grouped[i])):
-                newtext = translator.translate(grouped[i][j]["text"].replace("\n", " "), from_, to_)
-                sss = copy.deepcopy(grouped[i][j])
-                sss["text"] = newtext
-                sss["text"] = sss["text"].replace("\r", "")
-                newsrt.append(sss)
+                translation = translator.translate(grouped[i][j]["text"], from_, to_, db_path=None)
+                newsrt.append({
+                    "from": grouped[i][j]["from"],
+                    "to": grouped[i][j]["to"],
+                    "text": translation
+                })
         else:
-            spllited_translations = res.split("\n")
-            for j in range(len(spllited_translations) - 1):
-                sss = copy.deepcopy(grouped[i][j])
-                sss["text"] = spllited_translations[j]
-                sss["text"] = sss["text"].replace("\r", "")
-                newsrt.append(sss)
-
+            succes += 1
+            for j in range(len(translation_content)):
+                newsrt.append(
+                    {
+                        "from": grouped[i][j]["from"],
+                        "to": grouped[i][j]["to"],
+                        "text": translation_content[j]
+                    }
+                )
+        print(f"Translated {i + 1}/{len(grouped)} groups. Success: {succes}, Fail: {fail}")
     return newsrt
-

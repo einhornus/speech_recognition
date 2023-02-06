@@ -1,12 +1,15 @@
 import json
+import math
 import random
 import sqlite3
 import storage.bert
 from sklearn.neighbors import KDTree
+
+import subtitles.subs
 import translation.language_detection
 
 TITLE_WEIGHT = 0.5
-MAX_RESULTS = 6
+MAX_RESULTS = 12
 
 
 class Catalogue:
@@ -14,7 +17,7 @@ class Catalogue:
         conn = sqlite3.connect("data//database.db")
         c = conn.cursor()
         c.execute(
-            "SELECT video_id, title, keywords, embedding, original_language, thumbnail FROM videos")
+            "SELECT video_id, title, keywords, embedding, original_language, thumbnail, duration FROM videos")
         self.videos = []
         for row in c.fetchall():
             id = row[0]
@@ -23,6 +26,7 @@ class Catalogue:
             embedding = json.loads(row[3])
             original_language = row[4]
             thumbnail = row[5]
+            duration = row[6]
             video = {
                 "id": id,
                 "keywords": keywords,
@@ -30,13 +34,23 @@ class Catalogue:
                 "title": title,
                 "original_language": original_language,
                 "thumbnail": thumbnail,
+                "duration": duration,
+                "languages": []
             }
+
+            c.execute(
+                "SELECT language FROM subtitles where video_id = ?", (id,))
+
+            rows = c.fetchall()
+            for row in rows:
+                video["languages"].append(row[0])
+
             self.videos.append(video)
         conn.commit()
         conn.close()
         print()
 
-    def search(self, query, original_language="an", language="og"):
+    def search(self, query, original_language="an", language="og", number_of_results=MAX_RESULTS):
         """
         search - perform a search of videos based on query, original language and language
 
@@ -61,24 +75,29 @@ class Catalogue:
         "thumbnail": the thumbnail image of the video
         """
 
-        existing_candidates = set()
+        query_words = query.split(" ")
+
         candidates = []
         for video in self.videos:
+            video["similarity"] = 0
             is_candidate = False
             if video["original_language"] == original_language or original_language == "an":
-                if language == "og" or language == "og_en" or language == "en":
+                if language == "og":
                     is_candidate = True
-                if language != "og" and video["translation_language"] == language:
+                if language == "en" and video["original_language"] != "en":
                     is_candidate = True
-                if language != "og" and (video["translation_language"] is not None and "og_" + video[
-                    "translation_language"] == language):
+                if language == "og_en" and video["original_language"] != "en":
                     is_candidate = True
-                if (language == "og_en" or language == "en") and video["original_language"] == "en":
-                    is_candidate = False
-            if is_candidate and video["id"] not in existing_candidates:
-                candidates.append(video)
-                existing_candidates.add(video["id"])
-        random.shuffle(candidates)
+                if language in video["languages"] and language != video["original_language"]:
+                    is_candidate = True
+                if len(language) == 5:
+                    if language[3:] in video["languages"] and video["original_language"] != language[3:]:
+                        is_candidate = True
+                if is_candidate and video["id"]:
+                    candidates.append(video)
+
+        # random.shuffle(candidates)
+        candidates.reverse()
 
         bert_query = None
         if query != "":
@@ -89,6 +108,15 @@ class Catalogue:
                 relevance = 0
             else:
                 relevance = storage.bert.sim(bert_query, video["embedding"])
+            keywords = video["keywords"].split("; ")
+            matches_keywords = False
+            for keyword in keywords:
+                if keyword in query_words:
+                    matches_keywords = True
+            if matches_keywords:
+                if relevance > 0:
+                    relevance *= 2
+            relevance += math.log(video["duration"]) * 0.03
             res.append((video, relevance))
 
         res.sort(key=lambda x: x[1], reverse=True)
@@ -103,8 +131,8 @@ class Catalogue:
             obj["thumbnail"] = res[i][0]["thumbnail"]
             result.append(obj)
 
-        if len(result) > MAX_RESULTS:
-            result = result[:MAX_RESULTS]
+        if len(result) > number_of_results:
+            result = result[:number_of_results]
 
         return result
 
@@ -120,22 +148,45 @@ class Catalogue:
         language (str): The language of the subtitles.
 
         Returns:
-        str: The subtitles for the video in the given language.
+        str: The subtitles for the video in the given language or None if no subtitles are found.
         """
+
+        if language == "og":
+            conn = sqlite3.connect("data//database.db")
+            c = conn.cursor()
+            c.execute("SELECT original_language FROM videos WHERE video_id=?", (video_id,))
+            language = None
+            for row in c.fetchall():
+                language = row[0]
+            conn.commit()
+            conn.close()
+
+        print("Looking for subs for video " + video_id + " in language ", language)
+
+        if language is None:
+            return None
+
         conn = sqlite3.connect("data//database.db")
         c = conn.cursor()
         c.execute("SELECT content FROM subtitles WHERE video_id=? AND language=?", (video_id, language))
         content = None
-        if c.rowcount == 0:
+        fetched = c.fetchall()
+        if len(fetched) == 0:
             pass
         else:
-            if c.rowcount > 1:
+            if len(fetched) > 1:
                 raise Exception("More than one subtitle found for video " + video_id + " in language " + language)
-        for row in c.fetchone():
-            content = row[0]
+            else:
+                for row in fetched:
+                    content = row[0]
         conn.commit()
         conn.close()
-        return content
+        if content is not None:
+            print("Found subtitles for video " + video_id + " in language " + language + "!")
+            return subtitles.subs.Subtitles(content=content)
+        else:
+            print("No subtitles for video " + video_id + " in language " + language + "!")
+            return None
 
     @staticmethod
     def write_subtitles(video_id, language, content):
@@ -152,20 +203,29 @@ class Catalogue:
         conn = sqlite3.connect("data//database.db")
         c = conn.cursor()
         c.execute("SELECT content FROM subtitles WHERE video_id=? AND language=?", (video_id, language))
-        if c.rowcount == 0:
-            c.execute("INSERT INTO subtitles VALUES (?, ?, ?)", (video_id, language, content))
+        if len(c.fetchall()) == 0:
+            c.execute("INSERT INTO subtitles VALUES (?, ?, ?, ?)", (None, video_id, language, content))
         else:
             c.execute("UPDATE subtitles SET content=? WHERE video_id=? AND language=?", (content, video_id, language))
         conn.commit()
         conn.close()
 
+    def update_languages(self, video_id):
+        conn = sqlite3.connect("data//database.db")
+        c = conn.cursor()
+        languages = []
+        c.execute(
+            "SELECT language FROM subtitles where video_id = ?", (video_id,))
+        rows = c.fetchall()
+        for row in rows:
+            languages.append(row[0])
+        conn.commit()
+        conn.close()
+        for i in range(len(self.videos)):
+            if self.videos[i]["id"] == video_id:
+                self.videos[i]["languages"] = languages
 
-
-
-
-
-    def add_video(self, video_id, title, content, keywords, thumbnail, duration, original_language,
-                  translation_language, is_featured):
+    def add_video(self, video_id, title, content, keywords, thumbnail, duration, original_language, is_featured):
 
         """
             This function is used to add video information to the database and an in-memory list of videos.
@@ -220,29 +280,29 @@ class Catalogue:
         keywords_text = "; ".join(keywords)
         keywords_text = translation.language_detection.to_english(keywords_text)
 
-        already_exists = False
+        c = conn.cursor()
+        c.execute("INSERT INTO videos VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (None, video_id, title, keywords_text, duration, thumbnail,
+                   original_language, 1 if is_featured else 0, embedding_text))
+
+        conn.commit()
+        conn.close()
+
+        obj = {
+            "id": video_id,
+            "keywords": keywords_text,
+            "embedding": embedding,
+            "title": title,
+            "thumbnail": thumbnail,
+            "duration": duration,
+            "original_language": original_language,
+            "languages": []
+        }
+
+        self.videos.append(obj)
+
+    def is_video_exists(self, id):
         for video in self.videos:
-            if video["id"] == video_id and video["original_language"] == original_language and video[
-                "translation_language"] == translation_language:
-                already_exists = True
-
-        if not already_exists:
-            c = conn.cursor()
-            c.execute("INSERT INTO videos VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                      (None, video_id, title, keywords_text, duration, thumbnail,
-                       original_language, translation_language, 1 if is_featured else 0, embedding_text))
-            conn.commit()
-            conn.close()
-
-            obj = {
-                "id": video_id,
-                "keywords": keywords_text,
-                "embedding": embedding,
-                "title": title,
-                "thumbnail": thumbnail,
-                "original_language": original_language,
-                "translation_language": translation_language,
-            }
-
-            if not already_exists:
-                self.videos.append(obj)
+            if video["id"] == id:
+                return True
+        return False

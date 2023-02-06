@@ -9,12 +9,17 @@ class Subtitles:
             self.data = []
         if "data" in args:
             self.data = args["data"]
+        if "content" in args:
+            self.data = subtitles.utils.get_subs_from_content(args["content"])
 
-    def get_content(self):
+    def get_raw_content(self):
         res = ""
         for i in range(len(self.data)):
             res += self.data[i]["text"] + "\n"
         return res
+
+    def get_content(self):
+        return subtitles.utils.get_subs_content(self.data)
 
     @staticmethod
     def merge_subtitles(list):

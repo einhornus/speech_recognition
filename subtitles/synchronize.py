@@ -136,34 +136,41 @@ def sync_subs(subs_original, subs_translation):
     for i in range(len(subs_translation)):
         sizes_translation.append(subs_translation[i]["to"] - subs_translation[i]["from"])
 
-    absolute_diff_limit = 300
-    while True:
+    absolute_diff_limit = 500
+    q = 0
+    window_size = 3
+    while q < 10000:
         diffs = []
         for i in range(len(subs_original)):
-            for j in range(len(subs_translation)):
-                if abs(i / len(subs_original) - j / len(subs_translation)) < 0.1:
-                    d_begin = abs(subs_original[i]["from"] - subs_translation[j]["from"])
-                    d_end = abs(subs_original[i]["to"] - subs_translation[j]["to"])
-                    if absolute_diff_limit >= d_begin > 0:
-                        obj1 = {
-                            "original": i,
-                            "translation": j,
-                            "diff": d_begin,
-                            "type": "begin"
-                        }
-                        diffs.append(obj1)
-                    if absolute_diff_limit >= d_end > 0:
-                        obj2 = {
-                            "original": i,
-                            "translation": j,
-                            "diff": d_end,
-                            "type": "end"
-                        }
-                        diffs.append(obj2)
-        diffs.sort(key=lambda x: x["diff"])
+            central_index = int(round(i / len(subs_original) * len(subs_translation)))
+            left_index = max(0, central_index - window_size)
+            right_index = min(len(subs_translation) - 1, central_index + window_size + 1)
+            for j in range(left_index, right_index):
+                d_begin = abs(subs_original[i]["from"] - subs_translation[j]["from"])
+                d_end = abs(subs_original[i]["to"] - subs_translation[j]["to"])
+                if absolute_diff_limit >= d_begin > 0:
+                    obj1 = {
+                        "original": i,
+                        "translation": j,
+                        "diff": d_begin,
+                        "type": "begin"
+                    }
+                    diffs.append(obj1)
+                if absolute_diff_limit >= d_end > 0:
+                    obj2 = {
+                        "original": i,
+                        "translation": j,
+                        "diff": d_end,
+                        "type": "end"
+                    }
+                    diffs.append(obj2)
+        #diffs.sort(key=lambda x: x["diff"])
         if len(diffs) > 0:
-            diff = diffs[0]
-            print(diff)
+            min_diff = diffs[0]
+            for i in range(len(diffs)):
+                if diffs[i]["diff"] < min_diff["diff"]:
+                    min_diff = diffs[i]
+            diff = min_diff
             if diff["type"] == "begin":
                 midpoint = (subs_original[diff["original"]]["from"] + subs_translation[diff["translation"]]["from"]) / 2
                 subs_original[diff["original"]]["from"] = midpoint
@@ -174,6 +181,7 @@ def sync_subs(subs_original, subs_translation):
                 subs_translation[diff["translation"]]["to"] = midpoint
         else:
             break
+        q += 1
 
     #subs_original, subs_translation = merge_segments(subs_original, subs_translation)
     res1 = subtitles.subs.Subtitles(data=subs_original)
